@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>پنل مدیریت سامانه</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#06100b;color:#f2f5f2;font-family:Tahoma,Arial,sans-serif}
+.wrap{width:min(1180px,94%);margin:30px auto}.box{background:#0d1c14;border:1px solid #2b4938;border-radius:20px;padding:20px;box-shadow:0 18px 60px #0006}
+h1{margin-top:0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.stat{padding:18px;background:#10251a;border:1px solid #294433;border-radius:16px}.stat b{font-size:25px;display:block}.muted{color:#9caea3;font-size:12px}
+input,button{font:inherit}input{width:100%;padding:13px;border-radius:12px;border:1px solid #304b3b;background:#07130d;color:#fff;margin:7px 0 12px}button{padding:11px 14px;border-radius:12px;border:1px solid #4d6a56;background:#173422;color:#fff;cursor:pointer}.primary{background:#c9a65b;color:#151108;border:0;font-weight:bold}.danger{background:#512525}.hidden{display:none}.item{margin:10px 0;padding:16px;border:1px solid #294333;border-radius:16px;background:#0a1810}.top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.badge{padding:5px 9px;border-radius:999px;background:#163a28;color:#9be0b8;font-size:11px}.text{white-space:pre-wrap;line-height:2;color:#d8e0db}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.err{color:#ff9b9b}.ok{color:#9be0b8}@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body><div class="wrap">
+<div id="login" class="box">
+<h1>ورود مدیر</h1><p class="muted">دسترسی فقط با اطلاعاتی که در Railway به‌صورت Environment Variable تنظیم می‌کنید.</p>
+<input id="u" placeholder="نام کاربری" autocomplete="username">
+<input id="p" placeholder="رمز عبور" type="password" autocomplete="current-password">
+<button class="primary" onclick="login()">ورود امن</button><p id="le" class="err"></p>
+</div>
+<div id="panel" class="hidden">
+<div class="box"><div class="top"><div><h1>پنل مدیریت</h1><div class="muted">گزارش‌ها و وضعیت سامانه</div></div><button onclick="logout()">خروج</button></div>
+<div class="grid" style="margin-top:18px"><div class="stat"><b id="sr">0</b><span class="muted">گزارش</span></div><div class="stat"><b id="sd">0</b><span class="muted">نذر</span></div><div class="stat"><b id="sv">0</b><span class="muted">بازدید</span></div><div class="stat"><b id="sp">0</b><span class="muted">ارسال ناموفق تلگرام</span></div></div></div>
+<div class="box" style="margin-top:16px"><div class="top"><h2>گزارش‌های مردمی</h2><button onclick="loadAll()">به‌روزرسانی</button></div><div id="reports"></div></div>
+</div></div>
+<script>
+async function api(p,o={}){let r=await fetch(p,{credentials:"same-origin",headers:{"Content-Type":"application/json",...(o.headers||{})},...o});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||"خطا");return d}
+async function login(){document.getElementById("le").textContent="";try{await api("/api/admin/login",{method:"POST",body:JSON.stringify({username:u.value,password:p.value})});show()}catch(e){le.textContent=e.message}}
+async function logout(){await api("/api/admin/logout",{method:"POST"});location.reload()}
+function show(){loginBox=false;document.getElementById("login").classList.add("hidden");document.getElementById("panel").classList.remove("hidden");loadAll()}
+async function loadAll(){try{let s=await api("/api/admin/stats"),r=await api("/api/admin/reports");sr.textContent=s.reports;sd.textContent=s.donations;sv.textContent=s.visits;sp.textContent=s.telegram_pending;
+reports.innerHTML=r.reports.map(x=>`<div class="item"><div class="top"><b>${esc(x.id)}</b><span class="badge">${x.telegram_sent?"ارسال شد":"ارسال نشده"}</span></div><div class="muted">${esc(x.created_at)} — ${esc(x.category)} — ${esc(x.place||"بدون محدوده")}</div><p><b>نام:</b> ${esc(x.anonymous?"ناشناس":x.name||"ثبت نشده")}<br><b>تلفن:</b> ${esc(x.anonymous?"—":x.phone||"ثبت نشده")}</p><div class="text">${esc(x.text)}</div>${x.telegram_sent?"":`<div class="actions"><button onclick="retry('${esc(x.id)}')">ارسال دوباره به تلگرام</button></div>`}</div>`).join("")||'<p class="muted">گزارشی ثبت نشده است.</p>'
+}catch(e){if(e.message.includes("ورود"))location.reload();else reports.innerHTML='<p class="err">'+esc(e.message)+'</p>'}}
+async function retry(id){try{await api("/api/admin/retry-telegram/"+encodeURIComponent(id),{method:"POST"});loadAll()}catch(e){alert(e.message)}}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
+(async()=>{try{let m=await api("/api/admin/me");if(m.authenticated)show()}catch{}})()
+</script></body></html>
